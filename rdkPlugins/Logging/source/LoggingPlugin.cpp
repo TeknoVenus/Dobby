@@ -69,7 +69,7 @@ unsigned LoggingPlugin::hookHints() const
 bool LoggingPlugin::postInstallation()
 {
     AI_LOG_INFO("Running Logging postInstallation hook");
-
+    AI_LOG_INFO("test log info");
     // Redirect hook output to stdout/stderr
     if (mContainerConfig->annotations == nullptr)
     {

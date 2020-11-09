@@ -135,6 +135,7 @@ set( CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_LIST_DIR}/cmake" )
 # Find the 3rd party libraries and header files
 find_package( libnl REQUIRED )
 find_package( dbus REQUIRED )
+find_package( Rbus REQUIRED )
 find_package( jsoncpp REQUIRED )
 if ( LEGACY_COMPONENTS )
     find_package( ctemplate REQUIRED )

@@ -27,6 +27,7 @@ add_library( IpcService
         source/sdbus/SDBusAsyncReplyGetter.cpp
         source/sdbus/SDBusAsyncReplySender.cpp
 
+        source/rbus/RBusIpcService.cpp
 
         )
 
