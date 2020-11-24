@@ -37,6 +37,7 @@
 #include <condition_variable>
 #include <functional>
 #include <queue>
+#include <type_traits>
 
 typedef struct r_bus r_bus;
 typedef struct r_bus_slot r_bus_slot;
@@ -62,12 +63,15 @@ class RBusIpcService : public AI_IPC::IIpcService
         ~RBusIpcService() final;
         bool start() override;
         bool stop() override;
-
+        bool init(const std::string &serviceName, int defaultTimeoutMs);
+        void eventLoopThread();
+        bool invokeMethod(const Method &method,const VariantList &args,
+                          VariantList &replyArgs,int timeoutMs);
     private:
     uint64_t mDefaultTimeoutUsecs;
 
     std::thread mThread;
-    r_bus *mRBus;
+    rbusHandle_t *mRBus;
 
     std::atomic<bool> mStarted;
 
