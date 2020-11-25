@@ -109,22 +109,86 @@ bool RBusIpcService::invokeMethod(const Method &method,
         rtMessage_AddString(*msg,"name",method.name.c_str());
         
         VariantList temp_args = args;
-        rbusObject_t obj_for_method;
-        rbusObject_Init(&obj_for_method,"MethodObject");
-        while(temp_args.size()>0){
+        rbusObject_t obj_for_method_in;
+        rbusObject_Init(&obj_for_method_in,"MethodObjectIn");
+        rbusObject_t obj_for_method_out;
+        rbusObject_Init(&obj_for_method_in,"MethodObjectOut");
+        int inc = 0;
+        for(Variant arg:args){
             rbusProperty_t curr_prop;
             rbusValue_t curr_val;
             rbusValue_Init(&curr_val);
-            Variant arg = temp_args.back();
-            if(arg.type()==typeid(int16_t)){
-                int16_t numcp = std::get<int16_t>(arg);
-                rbusValue_SetInt16(curr_val,arg);
+            if(arg.type()==typeid(bool)){
+                bool numcp = boost::get<bool>(arg);
+                rbusValue_SetBoolean(curr_val,numcp);
+            } else if(arg.type()==typeid(int16_t)){
+                int16_t numcp = boost::get<int16_t>(arg);
+                rbusValue_SetInt16(curr_val,numcp);
+            } else if(arg.type()==typeid(int32_t)){
+                int32_t numcp = boost::get<int32_t>(arg);
+                rbusValue_SetInt32(curr_val,numcp);
+            } else if(arg.type()==typeid(int64_t)){
+                int64_t numcp = boost::get<int64_t>(arg);
+                rbusValue_SetInt64(curr_val,numcp);
+            } if(arg.type()==typeid(uint16_t)){
+                uint16_t numcp = boost::get<uint16_t>(arg);
+                rbusValue_SetUInt16(curr_val,numcp);
+            } else if(arg.type()==typeid(uint32_t)){
+                uint32_t numcp = boost::get<uint32_t>(arg);
+                rbusValue_SetUInt32(curr_val,numcp);
+            } else if(arg.type()==typeid(uint64_t)){
+                uint64_t numcp = boost::get<uint64_t>(arg);
+                rbusValue_SetUInt64(curr_val,numcp);
+            } else if(arg.type()==typeid(std::string)){
+                const char *numcp = boost::get<char *>(arg);
+                rbusValue_SetString(curr_val,numcp);
             }
-            rbusProperty_Init(&curr_prop);
-            
+            const char *prmstring = ("param" + std::to_string(inc)).c_str();
+            inc++;
+            rbusProperty_Init(&curr_prop,prmstring,curr_val);
+            rbusObject_SetProperty(obj_for_method_in,curr_prop);
         }
-        rbusMethod_Invoke(*mRBus,method.name.c_str(),)
 
+        for(Variant arg:replyArgs){
+            rbusProperty_t curr_prop;
+            rbusValue_t curr_val;
+            rbusValue_Init(&curr_val);
+            if(arg.type()==typeid(bool)){
+                bool numcp = boost::get<bool>(arg);
+                rbusValue_SetBoolean(curr_val,numcp);
+            } else if(arg.type()==typeid(int16_t)){
+                int16_t numcp = boost::get<int16_t>(arg);
+                rbusValue_SetInt16(curr_val,numcp);
+            } else if(arg.type()==typeid(int32_t)){
+                int32_t numcp = boost::get<int32_t>(arg);
+                rbusValue_SetInt32(curr_val,numcp);
+            } else if(arg.type()==typeid(int64_t)){
+                int64_t numcp = boost::get<int64_t>(arg);
+                rbusValue_SetInt64(curr_val,numcp);
+            } if(arg.type()==typeid(uint16_t)){
+                uint16_t numcp = boost::get<uint16_t>(arg);
+                rbusValue_SetUInt16(curr_val,numcp);
+            } else if(arg.type()==typeid(uint32_t)){
+                uint32_t numcp = boost::get<uint32_t>(arg);
+                rbusValue_SetUInt32(curr_val,numcp);
+            } else if(arg.type()==typeid(uint64_t)){
+                uint64_t numcp = boost::get<uint64_t>(arg);
+                rbusValue_SetUInt64(curr_val,numcp);
+            } else if(arg.type()==typeid(std::string)){
+                const char *numcp = boost::get<char *>(arg);
+                rbusValue_SetString(curr_val,numcp);
+            }
+            const char *prmstring = ("param" + std::to_string(inc)).c_str();
+            inc++;
+            rbusProperty_Init(&curr_prop,prmstring,curr_val);
+            rbusObject_SetProperty(obj_for_method_out,curr_prop);
+        }
+        rbusError_t rc = rbusMethod_Invoke(*mRBus,method.name.c_str(),obj_for_method_in,&obj_for_method_out);
+        if(rc>=1){
+            AI_LOG_SYS_FATAL("Failed to invoke")
+            return false;
+        }
+        return true;
     };
 }                                  
 
