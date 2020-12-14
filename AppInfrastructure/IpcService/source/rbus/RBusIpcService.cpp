@@ -3,7 +3,7 @@
 #include <rbus/rbus.h>
 #include <rbus-core/rbus_core.h>
 #include <systemd/sd-event.h>
-
+#include <IpcCommon.h>
 #include <sstream>
 
 #include <errno.h>
@@ -11,6 +11,7 @@
 #include <unistd.h>
 #include <sys/eventfd.h>
 using namespace AI_IPC;
+
 
 RBusIpcService::RBusIpcService(const std::string &busAddress,
                                  const std::string& serviceName,
@@ -23,7 +24,11 @@ RBusIpcService::RBusIpcService(const std::string &busAddress,
     , mLastExecTag(0)
     , mExecEventFd(-1)
 {
-
+    rbusHandle_t bus = nullptr;
+    char *tmp;
+    tmp = strdup(serviceName.c_str());
+    rbusError_t rc = rbus_open(&bus,tmp);
+    mRBus = &bus;
     
 }
 RBusIpcService::RBusIpcService(BusType busType, 
@@ -39,16 +44,19 @@ RBusIpcService::RBusIpcService(BusType busType,
 {
     rbusHandle_t bus = nullptr;
     rbusError_t rc = (rbusError_t)1;
+    char *tmp;
     switch (busType){
         case SystemBus:
-            rc = rbus_open(&bus,"SYSTEM");
+            tmp = strdup("SYSTEM");
+            rc = rbus_open(&bus,tmp);
             break;
         case SessionBus:
-            rc = rbus_open(&bus,"SESSION");
+            tmp = strdup("SESSION");
+            rc = rbus_open(&bus,tmp);
             break;
     }
     if((rc>(rbusError_t)0)||!bus){
-        AI_LOG_SYS_FATAL(-rc, "Failed to open connection to rbus")
+        AI_LOG_SYS_FATAL(-rc, "Failed to open connection to rbus");
         return;
     }
 
@@ -67,7 +75,8 @@ RBusIpcService::~RBusIpcService()
 }
     
 bool RBusIpcService::start()
-{  
+{
+    return true; 
 }
 
 bool RBusIpcService::init(const std::string &serviceName, int defaultTimeoutMs)
@@ -83,6 +92,7 @@ bool RBusIpcService::init(const std::string &serviceName, int defaultTimeoutMs)
         AI_LOG_SYS_ERROR(errno, "failed to created eventfd");
         return false;
     }
+    return true;
 }
 
 bool RBusIpcService::invokeMethod(const Method &method,
@@ -101,13 +111,14 @@ bool RBusIpcService::invokeMethod(const Method &method,
     bool success = false;
     std::function<void()> methodCallLambda = [&]()
     {
+        /*
         rtMessage *msg;
         rtMessage_Create(msg);
         rtMessage_AddString(*msg,"service",method.service.c_str());
         rtMessage_AddString(*msg,"object",method.object.c_str());
         rtMessage_AddString(*msg,"interface",method.interface.c_str());
         rtMessage_AddString(*msg,"name",method.name.c_str());
-        
+        */
         VariantList temp_args = args;
         rbusObject_t obj_for_method_in;
         rbusObject_Init(&obj_for_method_in,"MethodObjectIn");
@@ -140,7 +151,8 @@ bool RBusIpcService::invokeMethod(const Method &method,
                 uint64_t numcp = boost::get<uint64_t>(arg);
                 rbusValue_SetUInt64(curr_val,numcp);
             } else if(arg.type()==typeid(std::string)){
-                const char *numcp = boost::get<char *>(arg);
+                const char *tmstring = boost::get<std::string>(arg).c_str();
+                char *numcp = strdup(tmstring);
                 rbusValue_SetString(curr_val,numcp);
             }
             const char *prmstring = ("param" + std::to_string(inc)).c_str();
@@ -175,7 +187,7 @@ bool RBusIpcService::invokeMethod(const Method &method,
                 uint64_t numcp = boost::get<uint64_t>(arg);
                 rbusValue_SetUInt64(curr_val,numcp);
             } else if(arg.type()==typeid(std::string)){
-                const char *numcp = boost::get<char *>(arg);
+                const char *numcp = boost::get<std::string>(arg).c_str();
                 rbusValue_SetString(curr_val,numcp);
             }
             const char *prmstring = ("param" + std::to_string(inc)).c_str();
@@ -185,17 +197,128 @@ bool RBusIpcService::invokeMethod(const Method &method,
         }
         rbusError_t rc = rbusMethod_Invoke(*mRBus,method.name.c_str(),obj_for_method_in,&obj_for_method_out);
         if(rc>=1){
-            AI_LOG_SYS_FATAL("Failed to invoke")
+            AI_LOG_SYS_FATAL(rc,"Failed to invoke");
             return false;
         }
+        for(int i=0;i<replyArgs.size();i++){
+            std::string s = "param" + i;
+            const char *stochar = s.c_str();
+            Variant arg = replyArgs[i];
+            rbusValue_t rbv;
+            rbusValue_Init(&rbv);
+            rbv = rbusProperty_GetValue(rbusObject_GetProperty(obj_for_method_out,stochar));
+            rbusValue_Retain(rbv);
+
+            if(arg.type()==typeid(bool)){
+                arg = rbusValue_GetBoolean(rbv);
+            } else if(arg.type()==typeid(int16_t)){
+                arg = rbusValue_GetInt16(rbv);
+            } else if(arg.type()==typeid(int32_t)){
+                arg = rbusValue_GetInt32(rbv);
+            } else if(arg.type()==typeid(int64_t)){
+                arg = rbusValue_GetInt64(rbv);
+            } if(arg.type()==typeid(uint16_t)){
+                arg = rbusValue_GetUInt16(rbv);
+            } else if(arg.type()==typeid(uint32_t)){
+                arg = rbusValue_GetUInt32(rbv);
+            } else if(arg.type()==typeid(uint64_t)){
+                arg = rbusValue_GetUInt64(rbv);
+            } else if(arg.type()==typeid(std::string)){
+                arg = rbusValue_GetString(rbv,NULL);
+            }
         return true;
     };
-}                                  
+    };                               
+}
+rbusError_t RBusIpcService::eventSubHandler(rbusHandle_t handle, rbusEventSubAction_t action, const char* eventName, rbusFilter_t filter, int32_t interval, bool* autoPublish)
+{
+    (void)handle;
+    (void)filter;
+    (void)autoPublish;
+    (void)interval;
+
+    int subscribed1 = 0;
+    int subscribed2 = 0;
+    printf(
+        "eventSubHandler called:\n" \
+        "\taction=%s\n" \
+        "\teventName=%s\n",
+        action == RBUS_EVENT_ACTION_SUBSCRIBE ? "subscribe" : "unsubscribe",
+        eventName);
+
+    if(!strcmp("Device.Provider1.Event1!", eventName))
+    {
+        subscribed1 = action == RBUS_EVENT_ACTION_SUBSCRIBE ? 1 : 0;
+    }
+    else if(!strcmp("Device.Provider1.Event2!", eventName))
+    {
+        subscribed2 = action == RBUS_EVENT_ACTION_SUBSCRIBE ? 1 : 0;
+    }
+    else
+    {
+        printf("provider: eventSubHandler unexpected eventName %s\n", eventName);
+    }
+
+    return RBUS_ERROR_SUCCESS;
+}
+
+rbusMethodHandler_t RBusIpcService::handlerRegistration(rbusHandle_t handle,char const* methodName,rbusObject_t inParams,rbusObject_t outParams,rbusMethodAsyncHandle_t asyncHandle)
+{
+    if(strcmp(methodName, "DOBBY_CTRL_METHOD_START_FROM_BUNDLE") == 0)
+    {
+
+    }
+    else if(strcmp(methodName, "DOBBY_CTRL_METHOD_STOP") == 0)
+    {
+
+    }
+}
+std::string RBusIpcService::registerMethodHandler(const Method &method,
+                                                  const MethodHandler &handler)
+{
+    rbusObject_t outParams;
+    rbusObject_Init(&outParams,"outparameters");
+    rbusMethodHandler_t mhandler = handlerRegistration(*mRBus,method.name.c_str(),NULL,outParams,NULL);
+    char *tmp = strdup(method.name.c_str());
+    rbusDataElement_t dataElements[1] ={
+        {tmp, RBUS_ELEMENT_TYPE_METHOD, {NULL, NULL, NULL, NULL, NULL, mhandler}}
+    };
+
+    //register methods like in the methodprovider???
+
+    
+    rbusError_t rc = rbus_regDataElements(*mRBus,1,dataElements);
+    return "RBUS_ERROR_SUCCESS";
+    //maybe this isn't even needed because of rbus structure.
+    /*std::string tag;
+    std::function<void()> registerLambda =
+        [&]()
+        {
+            bool existing = false;
+            r_bus_slot *objSlot = nullptr;
+            for(const auto &it : mMethodHandlers)
+            {
+                const RegisteredMethod &regMethod = it.second;
+                if(regMethod.name == method.name)
+                {
+                    existing=true;
+                    break;
+                }
+            }
+
+            if (existing){
+                AI_LOG_WARN("Already have method:%s registered",method.name.c_str());
+                return;
+            }
+        };
+    */
+    
+}                                                  
 
 //probably not needed?
 void RBusIpcService::eventLoopThread()
 {
-    AI_LOG_WARN("EVENT LOOP ATTEMPTED RUN")
+    AI_LOG_WARN("EVENT LOOP ATTEMPTED RUN");
 }
 
 /* create a new bus, set it's address then open it

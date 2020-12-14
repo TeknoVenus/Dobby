@@ -21,15 +21,22 @@ add_library( IpcService
         source/common/IpcVariantList.cpp
         source/common/IpcFileDescriptor.cpp
 
-        source/sdbus/SDBusIpcFactory.cpp
-        source/sdbus/SDBusIpcService.cpp
-        source/sdbus/SDBusArguments.cpp
-        source/sdbus/SDBusAsyncReplyGetter.cpp
-        source/sdbus/SDBusAsyncReplySender.cpp
+
+        #source/sdbus/SDBusIpcFactory.cpp
+        #source/sdbus/SDBusIpcService.cpp
+        #source/sdbus/SDBusArguments.cpp
+        #source/sdbus/SDBusAsyncReplyGetter.cpp
+        #source/sdbus/SDBusAsyncReplySender.cpp
 
         source/rbus/RBusIpcService.cpp
-
+        source/rbus/RBusIpcFactory.cpp
+        
         )
+
+target_link_libraries(IpcService       
+        rbus  
+        Threads::Threads      
+)
 
 set_target_properties(IpcService PROPERTIES POSITION_INDEPENDENT_CODE ON)
 

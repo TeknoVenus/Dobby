@@ -36,6 +36,7 @@
 namespace AI_IPC
 {
 
+//#ifdef DBUS
 std::shared_ptr<IIpcService> createIpcService(const std::shared_ptr<const AI_DBUS::IDbusServer>& dbusServer, const std::string& serviceName, int defaultTimeoutMs /*= -1*/)
 {
     AI_LOG_FN_ENTRY();
@@ -57,7 +58,10 @@ std::shared_ptr<IIpcService> createIpcService( const std::shared_ptr<const AI_DB
 
     return std::make_shared<IpcService>(dbusServer, serviceName, packageManager, dbusEntitlementCheckNeeded, defaultTimeoutMs);
 }
-
+//#endif
+//ifdef RBUS
+//define createIPCService with rbus instead of dbus
+//endif
 std::shared_ptr<IIpcService> createSystemBusIpcService(const std::string& serviceName, int defaultTimeoutMs /*= -1*/)
 {
     return std::make_shared<IpcService>(IpcService::BusType::SystemBus, serviceName, defaultTimeoutMs);

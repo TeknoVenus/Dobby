@@ -25,9 +25,10 @@
 #ifndef RBUSIPCSERVICE_H
 #define RBUSIPCSERVICE_H
 
-#include "IpcCommon.h"
-#include "IIpcService.h"
-
+#include <IpcCommon.h>
+#include <IIpcService.h>
+#include <IpcVariantList.h>
+#include <rbus/rbus.h>
 #include <set>
 #include <atomic>
 #include <string>
@@ -65,14 +66,28 @@ class RBusIpcService : public AI_IPC::IIpcService
         bool stop() override;
         bool init(const std::string &serviceName, int defaultTimeoutMs);
         void eventLoopThread();
-        bool invokeMethod(const Method &method,const VariantList &args,
-                          VariantList &replyArgs,int timeoutMs);
+        bool invokeMethod(const AI_IPC::Method &method, const AI_IPC::VariantList &args, AI_IPC::VariantList &replyArgs,int timeoutMs) override;
+        std::shared_ptr<AI_IPC::IAsyncReplyGetter> invokeMethod(const AI_IPC::Method &method, const AI_IPC::VariantList &args, int timeoutMs) override;
+        bool emitSignal(const AI_IPC::Signal& signal, const AI_IPC::VariantList& args) override;
+        std::string registerSignalHandler(const AI_IPC::Signal& signal, const AI_IPC::SignalHandler& handler) override;
+        bool unregisterHandler(const std::string& regId) override;
+        bool enableMonitor(const std::set<std::string>& matchRules, const AI_IPC::MonitorHandler& handler);
+        bool disableMonitor() override;
+        bool isServiceAvailable(const std::string& serviceName) const override;
+        void flush() override;
+        std::string getBusAddress() const override;
+        std::string registerMethodHandler(const AI_IPC::Method &method,
+                                                  const AI_IPC::MethodHandler &handler) override;
+
+        rbusError_t eventSubHandler(rbusHandle_t handle, rbusEventSubAction_t action, const char* eventName, rbusFilter_t filter, int32_t interval, bool* autoPublish);
+        rbusMethodHandler_t handlerRegistration(rbusHandle_t handle, char const* methodName, rbusObject_t inParams,rbusObject_t outParams,rbusMethodAsyncHandle_t asyncHandle);
     private:
     uint64_t mDefaultTimeoutUsecs;
 
     std::thread mThread;
     rbusHandle_t *mRBus;
-
+    int subscribed1;
+    int subscribed2;
     std::atomic<bool> mStarted;
 
     struct RegisteredMethod
@@ -124,6 +139,8 @@ class RBusIpcService : public AI_IPC::IIpcService
     mutable std::mutex mExecLock;
     mutable std::condition_variable mExecCond;
     mutable std::deque< Executor > mExecQueue;
+    int runtime = 30;
+    
 
     std::map< uint64_t, std::shared_ptr<RBusAsyncReplyGetter> > mCalls;
     std::map< uint32_t, r_bus_message* > mCallReplies;
