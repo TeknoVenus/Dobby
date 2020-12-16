@@ -28,7 +28,6 @@
 #include <IpcCommon.h>
 #include <IIpcService.h>
 #include <IpcVariantList.h>
-#include <rbus/rbus.h>
 #include <set>
 #include <atomic>
 #include <string>
@@ -40,48 +39,41 @@
 #include <queue>
 #include <type_traits>
 
-typedef struct r_bus r_bus;
-typedef struct r_bus_slot r_bus_slot;
-typedef struct r_bus_message r_bus_message;
-typedef struct r_event_source r_event_source;
+typedef struct _rbusHandle_t* rbusHandle_t;
 
 class RBusAsyncReplyGetter;
 
-class RBusIpcService : public AI_IPC::IIpcService
-                      , public std::enable_shared_from_this<RBusIpcService>
+class RBusIpcService : public AI_IPC::IIpcService, public std::enable_shared_from_this<RBusIpcService>
 {
-    public:
-        enum BusType
-        {
-            SessionBus,
-            SystemBus
-        };
+public:
+    enum BusType
+    {
+        SessionBus,
+        SystemBus
+    };
 
-    public:
+public:
+    RBusIpcService(BusType busType, const std::string &serviceName, int defaultTimeoutMs = -1);
+    RBusIpcService(const std::string &busAddress, const std::string &serviceName, int defaultTimeoutMs = -1);
+    ~RBusIpcService() final;
+    bool start() override;
+    bool stop() override;
+    bool init(const std::string &serviceName, int defaultTimeoutMs);
+    void eventLoopThread();
+    bool invokeMethod(const AI_IPC::Method &method, const AI_IPC::VariantList &args, AI_IPC::VariantList &replyArgs, int timeoutMs) override;
+    std::shared_ptr<AI_IPC::IAsyncReplyGetter> invokeMethod(const AI_IPC::Method &method, const AI_IPC::VariantList &args, int timeoutMs) override;
+    bool emitSignal(const AI_IPC::Signal &signal, const AI_IPC::VariantList &args) override;
+    std::string registerSignalHandler(const AI_IPC::Signal &signal, const AI_IPC::SignalHandler &handler) override;
+    bool unregisterHandler(const std::string &regId) override;
+    bool enableMonitor(const std::set<std::string> &matchRules, const AI_IPC::MonitorHandler &handler);
+    bool disableMonitor() override;
+    bool isServiceAvailable(const std::string &serviceName) const override;
+    void flush() override;
+    std::string getBusAddress() const override;
+    std::string registerMethodHandler(const AI_IPC::Method &method,
+                                      const AI_IPC::MethodHandler &handler) override;
 
-        RBusIpcService(BusType busType, const std::string& serviceName,int defaultTimeoutMs = -1);
-        RBusIpcService(const std::string &busAddress, const std::string& serviceName, int defaultTimeoutMs = -1);
-        ~RBusIpcService() final;
-        bool start() override;
-        bool stop() override;
-        bool init(const std::string &serviceName, int defaultTimeoutMs);
-        void eventLoopThread();
-        bool invokeMethod(const AI_IPC::Method &method, const AI_IPC::VariantList &args, AI_IPC::VariantList &replyArgs,int timeoutMs) override;
-        std::shared_ptr<AI_IPC::IAsyncReplyGetter> invokeMethod(const AI_IPC::Method &method, const AI_IPC::VariantList &args, int timeoutMs) override;
-        bool emitSignal(const AI_IPC::Signal& signal, const AI_IPC::VariantList& args) override;
-        std::string registerSignalHandler(const AI_IPC::Signal& signal, const AI_IPC::SignalHandler& handler) override;
-        bool unregisterHandler(const std::string& regId) override;
-        bool enableMonitor(const std::set<std::string>& matchRules, const AI_IPC::MonitorHandler& handler);
-        bool disableMonitor() override;
-        bool isServiceAvailable(const std::string& serviceName) const override;
-        void flush() override;
-        std::string getBusAddress() const override;
-        std::string registerMethodHandler(const AI_IPC::Method &method,
-                                                  const AI_IPC::MethodHandler &handler) override;
-
-        rbusError_t eventSubHandler(rbusHandle_t handle, rbusEventSubAction_t action, const char* eventName, rbusFilter_t filter, int32_t interval, bool* autoPublish);
-        rbusMethodHandler_t handlerRegistration(rbusHandle_t handle, char const* methodName, rbusObject_t inParams,rbusObject_t outParams,rbusMethodAsyncHandle_t asyncHandle);
-    private:
+private:
     uint64_t mDefaultTimeoutUsecs;
 
     std::thread mThread;
@@ -90,38 +82,7 @@ class RBusIpcService : public AI_IPC::IIpcService
     int subscribed2;
     std::atomic<bool> mStarted;
 
-    struct RegisteredMethod
-    {
-        r_bus_slot *objectSlot;
-        std::string path;
-        std::string interface;
-        std::string name;
-        AI_IPC::MethodHandler callback;
-
-        RegisteredMethod(r_bus_slot *slot,
-                         const AI_IPC::Method &method,
-                         const AI_IPC::MethodHandler &handler)
-            : objectSlot(slot)
-            , path(method.object), interface(method.interface), name(method.name)
-            , callback(handler)
-        { }
-    };
-
-    struct RegisteredSignal
-    {
-        r_bus_slot *matchSlot;
-        AI_IPC::SignalHandler callback;
-
-        RegisteredSignal(r_bus_slot *slot,
-                         const AI_IPC::SignalHandler &handler)
-            : matchSlot(slot)
-            , callback(handler)
-        { }
-    };
-
     uint64_t mHandlerTag;
-    std::map<std::string, RegisteredMethod> mMethodHandlers;
-    std::map<std::string, RegisteredSignal> mSignalHandlers;
 
     struct Executor
     {
@@ -130,7 +91,8 @@ class RBusIpcService : public AI_IPC::IIpcService
 
         Executor(uint64_t t, std::function<void()> &&f)
             : tag(t), func(std::move(f))
-        { }
+        {
+        }
     };
 
     mutable uint64_t mExecCounter;
@@ -138,13 +100,10 @@ class RBusIpcService : public AI_IPC::IIpcService
     int mExecEventFd;
     mutable std::mutex mExecLock;
     mutable std::condition_variable mExecCond;
-    mutable std::deque< Executor > mExecQueue;
+    mutable std::deque<Executor> mExecQueue;
     int runtime = 30;
-    
 
-    std::map< uint64_t, std::shared_ptr<RBusAsyncReplyGetter> > mCalls;
-    std::map< uint32_t, r_bus_message* > mCallReplies;
+    std::map<uint64_t, std::shared_ptr<RBusAsyncReplyGetter>> mCalls;
     std::queue<uint32_t> mReplyIdentifiers;
 };
 #endif
-

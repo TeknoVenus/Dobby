@@ -45,7 +45,7 @@ target_link_libraries( ${PROJECT_NAME}
         IpcService
 
         # 3rd party libraries
-        systemd
+        Rbus
         Threads::Threads
         LIBNL::libnl
         LIBNL::libnl-route

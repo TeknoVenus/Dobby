@@ -17,4 +17,4 @@ std::shared_ptr<AI_IPC::IIpcService> AI_IPC::createSystemBusIpcService(const std
                                                                        int defaultTimeoutMs)
 {
     return std::make_shared<RBusIpcService>(RBusIpcService::SystemBus, serviceName, defaultTimeoutMs);
-} 
+}

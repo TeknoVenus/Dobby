@@ -59,6 +59,7 @@ target_link_libraries( # Specifies the target exec
         # Import the 3rd party libraries
         JsonCpp::JsonCpp
         systemd
+        Rbus
 
         # Adds pthread support (if it's a separate library on target)
         Threads::Threads

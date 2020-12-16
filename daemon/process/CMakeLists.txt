@@ -92,6 +92,7 @@ target_link_libraries( # Specifies the target exec
         systemd
         JsonCpp::JsonCpp
         DBUS::libdbus
+        Rbus
 
         # Adds pthread support (if it's a separate library on target)
         Threads::Threads
