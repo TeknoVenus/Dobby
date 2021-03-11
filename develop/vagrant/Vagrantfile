@@ -134,17 +134,13 @@ Vagrant.configure("2") do |config|
 
     ##################################################
     #
-    # Clone and build CRUN
+    # Clone and build CRUN from master
     #
     config.vm.provision "shell", privileged: false, inline: <<-SHELL
         figlet CRUN  # ASCII banner
         mkdir ~/crun
         cd ~/crun
-        git clone --depth 1 --branch 0.15 https://github.com/containers/crun.git .
-
-        # Apply patch for pid file not being created properly
-        cp /vagrant/0001-container-truncate-pid-file-before-writing-it.patch ./
-        patch -p1 < 0001-container-truncate-pid-file-before-writing-it.patch
+        git clone https://github.com/containers/crun.git .
 
         ./autogen.sh
         ./configure --disable-systemd
@@ -248,11 +244,13 @@ Vagrant.configure("2") do |config|
         figlet THUNDER REPO # ASCII banner
 
         # Make sure any extra Thunder dependencies are installed
-        sudo apt install -y gcc libtool autoconf pkg-config libarchive13 libarchive-dev libcurl3 libcurl4-gnutls-dev libssl-dev libgpgme11-dev libtool-bin
+        sudo apt install -y gcc libtool autoconf pkg-config libarchive13 libarchive-dev libcurl3 libcurl4-gnutls-dev libssl-dev libgpgme11-dev libtool-bin libcunit1-dev liblog4c-dev libfreetype6-dev libjpeg-dev xorg-dev
 
-        mkdir -p ~/srcThunder/Thunder
-        cd ~/srcThunder/Thunder
-        git clone https://github.com/rdkcentral/Thunder.git .
+        mkdir -p ~/srcThunder/
+        cd ~/srcThunder/
+        git clone https://github.com/rdkcentral/Thunder.git
+        git clone https://github.com/rdkcentral/ThunderClientLibraries.git
+        git clone https://github.com/rdkcentral/ThunderInterfaces.git
 
         cd ~/srcThunder/Thunder/Source
         ln -s ../Tools tools
@@ -268,6 +266,24 @@ Vagrant.configure("2") do |config|
         figlet THUNDER BUILD # ASCII banner
         cd ~/srcThunder/Thunder
         cmake  -DGENERIC_CMAKE_MODULE_PATH=/usr/local/lib/cmake -DDEBUG=ON -DVIRTUALINPUT=ON -DPLUGINS=ON -DCORE=ON -DPORT=9998 -DBINDING=127.0.0.1 -DPERSISTENT_PATH=/opt -DCMAKE_MODULE_PATH=./Tools ./CMakeLists.txt
+        make -j$(nproc)
+        sudo make install
+
+        # Install Thunder Interfaces
+        figlet THUNDER INTERFACES # ASCII banner
+        cd ~/srcThunder/ThunderInterfaces
+        mkdir build
+        cd build
+        cmake -DGENERIC_CMAKE_MODULE_PATH=/usr/local/lib/cmake -DCMAKE_MODULE_PATH=/home/vagrant/srcThunder/Thunder/Tools ..
+        make -j$(nproc)
+        sudo make install
+
+        # Install ThunderClientLibraries
+        figlet THUNDER CLIENT LIBS # ASCII banner
+        cd ~/srcThunder/ThunderClientLibraries
+        mkdir build
+        cd build
+        cmake -DSECURITYAGENT=ON ..
         make -j$(nproc)
         sudo make install
 
@@ -289,6 +305,7 @@ Vagrant.configure("2") do |config|
         #
         cd ~/srcThunder/rdkServices
         sed -i "s/include(services.cmake)/ if(BUILD_VAGRANT) \\n    # DO NOTHING FOR NOW \\n else()\\n    # include(services.cmake) \\n endif() \\n /g" CMakeLists.txt
+        git apply /vagrant/rdkservices.patch
         mkdir build
         cd build
         # Disable default plugins, enable only OCIContainer
@@ -303,6 +320,7 @@ Vagrant.configure("2") do |config|
                -DENABLE_MONITOR=true \
                -DENABLE_DEVICE_INFO=true \
                -DPLUGIN_OCICONTAINER=ON \
+               -DPLUGIN_SECURITYAGENT=ON \
                -DRDK_PLATFORM=DEV_VM ../
 
         make -j$(nproc)
