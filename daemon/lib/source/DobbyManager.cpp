@@ -339,9 +339,12 @@ bool DobbyManager::createAndStart(const ContainerId &id,
     // Second PID = DobbyInit (same as container.pid)
     if (pids.second < 0)
     {
-        AI_LOG_ERROR("Failed to create container - see crun log for more details");
+        // We failed to create the container - something went wrong when calling
+        // crun create
+        const std::string crunError(createBuffer->getBuffer().begin(), createBuffer->getBuffer().end());
+        AI_LOG_ERROR("Failed to create container '%s' with error: %s", id.c_str(), crunError.c_str());
 
-        // Dump the runtime output to a new file even if the container failed to start
+        // Dump the output to the container log as well, not just Dobby's log
         if (loggingPlugin)
         {
             mLogger->DumpBuffer(createBuffer->getMemFd(), -1, loggingPlugin, true);

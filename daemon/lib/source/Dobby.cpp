@@ -341,14 +341,15 @@ void Dobby::logJournaldPrinter(int level, const char *file, const char *func,
                                int line, const char *message)
 {
     int priority;
+    const char* priorityMsg;
     switch (level)
     {
-        case AI_DEBUG_LEVEL_FATAL:          priority = LOG_CRIT;      break;
-        case AI_DEBUG_LEVEL_ERROR:          priority = LOG_ERR;       break;
-        case AI_DEBUG_LEVEL_WARNING:        priority = LOG_WARNING;   break;
-        case AI_DEBUG_LEVEL_MILESTONE:      priority = LOG_NOTICE;    break;
-        case AI_DEBUG_LEVEL_INFO:           priority = LOG_INFO;      break;
-        case AI_DEBUG_LEVEL_DEBUG:          priority = LOG_DEBUG;     break;
+        case AI_DEBUG_LEVEL_FATAL:     priority = LOG_CRIT;    priorityMsg="FTL"; break;
+        case AI_DEBUG_LEVEL_ERROR:     priority = LOG_ERR;     priorityMsg="ERR"; break;
+        case AI_DEBUG_LEVEL_WARNING:   priority = LOG_WARNING; priorityMsg="WRN"; break;
+        case AI_DEBUG_LEVEL_MILESTONE: priority = LOG_NOTICE;  priorityMsg="MIL"; break;
+        case AI_DEBUG_LEVEL_INFO:      priority = LOG_INFO;    priorityMsg="NFO"; break;
+        case AI_DEBUG_LEVEL_DEBUG:     priority = LOG_DEBUG;   priorityMsg="DBG"; break;
         default:
             return;
     }
@@ -358,8 +359,8 @@ void Dobby::logJournaldPrinter(int level, const char *file, const char *func,
                     "CODE_FILE=%s", file,
                     "CODE_LINE=%i", line,
                     "CODE_FUNC=%s", func,
-                    "MESSAGE=%s", message,
-                    nullptr);
+                    "MESSAGE=%s [%s:%d] %s", priorityMsg, file, line, message, nullptr);
+
 }
 #endif // !defined(RDK)
 
